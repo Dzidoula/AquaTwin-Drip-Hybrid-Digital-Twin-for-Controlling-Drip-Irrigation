@@ -22,9 +22,13 @@ url = sprintf([ ...
 'soil_moisture_27_to_81cm'],...
 lat,lon);
 
-options = weboptions('Timeout',20,'ContentType','json'); % attendre 20 secondes
-
-json = webread(url,options);
+% `webread`/`weboptions` are broken in this GNU Octave build — see
+% SoilGrids_Rosetta.m for the same fix and details.
+[curl_status, curl_output] = system(['curl -s --max-time 20 "' url '"']);
+if curl_status ~= 0
+    error('curl failed with status %d', curl_status);
+end
+json = jsondecode(curl_output);
 
 SH0 =json.hourly.soil_moisture_0_to_1cm(1);
 

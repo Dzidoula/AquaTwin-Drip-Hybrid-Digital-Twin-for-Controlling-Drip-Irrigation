@@ -14,8 +14,15 @@ url = sprintf([ ...
 '&depth=0-5cm' ...
 '&value=mean'], lon, lat);
 
-options = weboptions('Timeout', 4*60);
-data = webread(url, options);
+% `webread`/`weboptions` are broken in this GNU Octave build (fails even on
+% a plain, known-good JSON endpoint like api.github.com — not specific to
+% this URL). Replaced with a curl + jsondecode equivalent, which round-trips
+% to an identical struct. See branch README/PR description for details.
+[curl_status, curl_output] = system(['curl -s --max-time 240 "' url '"']);
+if curl_status ~= 0
+    error('Echec de la requete SoilGrids (curl status=%d) pour (%.4f, %.4f)', curl_status, lat, lon);
+end
+data = jsondecode(curl_output);
 
 % Extraction robuste
 Sand = NaN; Silt = NaN; Clay = NaN; BD = NaN;

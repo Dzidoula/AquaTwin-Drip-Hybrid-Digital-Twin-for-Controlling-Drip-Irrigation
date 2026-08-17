@@ -12,8 +12,13 @@ function [T,RH,u2,Rs]=DataEvapotranspiration(lat,lon)
         lat,...
         lon);
 
-        options =weboptions('Timeout',30);
-        json =webread(url,options);
+        % `webread`/`weboptions` are broken in this GNU Octave build — see
+        % SoilGrids_Rosetta.m for the same fix and details.
+        [curl_status, curl_output] = system(['curl -s --max-time 30 "' url '"']);
+        if curl_status ~= 0
+            error('curl failed with status %d', curl_status);
+        end
+        json = jsondecode(curl_output);
 
         % VARIABLES HORAIRES
         
