@@ -73,7 +73,19 @@ end
 
 % 2. Appel Python Rosetta
 
-pythonFile = 'C:\Users\DELL\Desktop\CalendrierAgriculture\rosetta_cli.py';
+% NOTE (portage Octave/Linux) : le chemin d'origine etait code en dur vers
+% le PC Windows de l'auteur (C:\Users\DELL\Desktop\...), donc inexistant sur
+% toute autre machine. Remplace par un chemin relatif a ce fichier .m, qui
+% fonctionne quel que soit l'endroit ou le depot est clone.
+%
+% RESERVE SCIENTIFIQUE : rosetta_cli.py (ajoute par l'auteur le 2026-08-18)
+% contient des "equations Rosetta approximatives - a remplacer par les
+% vraies" (commentaire de l'auteur dans ce fichier) — ce n'est PAS le vrai
+% modele Rosetta (reseau de neurones entraine), juste un calcul provisoire.
+% Les resultats de cette fonction ne sont donc pas encore scientifiquement
+% valides ; a mettre a jour des que la vraie estimation Rosetta est fournie.
+scriptDir = fileparts(mfilename('fullpath'));
+pythonFile = fullfile(scriptDir, 'rosetta_cli.py');
 
 if ~exist(pythonFile, 'file')
     error('Fichier Python non trouv?: %s', pythonFile);
@@ -81,7 +93,7 @@ end
 
 % Formater avec POINT decimal
 fmt = @(x) strrep(sprintf('%.6f', x), ',', '.');
-cmd = sprintf('python "%s" %s %s %s %s', ...
+cmd = sprintf('python3 "%s" %s %s %s %s', ...
     pythonFile, fmt(Sand), fmt(Silt), fmt(Clay), fmt(BD));
 
 [status, result] = system(cmd);
