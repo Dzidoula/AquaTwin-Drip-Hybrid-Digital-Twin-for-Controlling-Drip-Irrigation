@@ -1,4 +1,10 @@
-function [SH, Pt] = TraceTeneurEnEauRacinaireStresseHydriqueEtPotentielHydrique_(lat, lon, culture, typeSol, Tmax, Psi_solution, tr, J, alpha_vg, n_vg, m_vg, theta_s, theta_r, k_s)
+function [SH, Pt, t, Theta_root] = TraceTeneurEnEauRacinaireStresseHydriqueEtPotentielHydrique_(lat, lon, culture, typeSol, Tmax, Psi_solution, tr, J, alpha_vg, n_vg, m_vg, theta_s, theta_r, k_s)
+% NOTE (fork) : main.m appelle cette fonction en demandant 4 valeurs de
+% retour ([SH, Pt, t_t, Theta_root]), mais elle n'en definissait que 2 —
+% alors que t et Theta_root sont deja calcules en interne (lignes
+% ci-dessous). Ce chemin de main.m n'avait donc jamais pu s'executer
+% jusqu'au bout. Expose simplement ce qui existait deja, sans changer le
+% calcul.
 
     [Hcc, RU, p_s, theta_actuel] = Solfeatures(J, culture, typeSol, lat, lon, alpha_vg, n_vg, m_vg, theta_s, theta_r, k_s);
     [X_all, Y_all, Xp, Yp, n_prim, n_dual, total_dof] = MeshGrid();
