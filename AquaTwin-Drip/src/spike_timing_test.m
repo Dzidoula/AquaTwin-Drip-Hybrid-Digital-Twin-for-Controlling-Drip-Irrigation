@@ -2,6 +2,11 @@
 % et chronometre une seule iteration, avant d'ecrire l'extraction propre
 % pour l'API. A supprimer une fois la reponse obtenue.
 
+% Aucun addpath n'existe dans le depot d'origine (le projet est normalement
+% ouvert tel quel dans MATLAB, qui indexe tous les sous-dossiers) — on le
+% fait nous-memes ici pour Octave.
+addpath(genpath(fileparts(mfilename('fullpath'))));
+
 culture = 'mais';
 lat = 9.3;
 lon = 2.6;
