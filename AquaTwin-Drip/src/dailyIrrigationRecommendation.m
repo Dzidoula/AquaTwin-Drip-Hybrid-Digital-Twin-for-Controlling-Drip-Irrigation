@@ -90,8 +90,18 @@ volume = max(V);
 soil_moisture = mean(Theta_root);
 severe_stress = mean(SH) > 0.5; % a affiner avec Alex : seuil provisoire
 
+% BUG (present tel quel dans main.m, hors de notre fork aussi) :
+% `Temps = heure + pas_heure` est en heures (ex: 15), mais `t_t` couvre la
+% fenetre d'un seul evenement d'irrigation en secondes (quelques
+% centaines) — donc `interp1` interroge presque toujours hors plage et
+% renvoie NaN. On ne sait pas encore quelle est la bonne conversion
+% voulue par Alex, donc plutot que d'inventer un facteur d'echelle, on
+% borne la requete a la derniere valeur connue (etat stationnaire en fin
+% de fenetre modelisee) pour rester utilisable en attendant sa reponse.
+% A REVOIR avec Alex.
 Temps = heure + pas_heure;
-theta_infiltre_new = interp1(t_t, Theta_root, Temps);
+Temps_clamped = min(max(Temps, min(t_t)), max(t_t));
+theta_infiltre_new = interp1(t_t, Theta_root, Temps_clamped);
 psi_new = psi_old + CalculTheta(theta_infiltre_new, lat, lon, alpha_vg, n_vg, m_vg, theta_s, theta_r, k_s);
 
 end
