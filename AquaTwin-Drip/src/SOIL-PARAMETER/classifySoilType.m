@@ -3,9 +3,12 @@ function soil_type = classifySoilType(lat,lon)
     [theta_r,theta_s,alpha,n,Ks,sand,silt,clay,BD]=SoilGrids_Rosetta(lat,lon)
     
     % Arrondir pour eviter les problemes de precision
-    sand = round(sand, 1);
-    silt = round(silt, 1);
-    clay = round(clay, 1);
+    % `round(x, n)` (arrondi a n decimales) n'est pas supporte par cette
+    % version d'Octave, seule la forme a 1 argument l'est — meme famille
+    % d'incompatibilite que webread/weboptions (voir SoilGrids_Rosetta.m).
+    sand = round(sand * 10) / 10;
+    silt = round(silt * 10) / 10;
+    clay = round(clay * 10) / 10;
     
     % Verifier que les pourcentages sont valides
     total = sand + silt + clay;
