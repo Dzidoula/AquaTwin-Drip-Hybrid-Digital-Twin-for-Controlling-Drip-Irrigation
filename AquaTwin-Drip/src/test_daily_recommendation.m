@@ -11,8 +11,8 @@ lon = 2.6;
 JourJulien = 220; % milieu de saison, arbitraire pour ce test
 
 tic;
-[should_irrigate, duration_s, volume, soil_moisture, severe_stress, psi_new] = ...
-    dailyIrrigationRecommendation(culture, lat, lon, JourJulien, []);
+[should_irrigate, duration_s, volume, soil_moisture, severe_stress, psi_new, theta_infiltre_new] = ...
+    dailyIrrigationRecommendation(culture, lat, lon, JourJulien, [], []);
 elapsed1 = toc;
 
 fprintf('\n=== Appel 1 (etat initial) ===\n');
@@ -21,8 +21,8 @@ fprintf('should_irrigate=%d duration_s=%.2f volume=%.2f soil_moisture=%.4f sever
     should_irrigate, duration_s, volume, soil_moisture, severe_stress);
 
 tic;
-[should_irrigate2, duration_s2, volume2, soil_moisture2, severe_stress2, psi_new2] = ...
-    dailyIrrigationRecommendation(culture, lat, lon, JourJulien + 1, psi_new);
+[should_irrigate2, duration_s2, volume2, soil_moisture2, severe_stress2, psi_new2, theta_infiltre_new2] = ...
+    dailyIrrigationRecommendation(culture, lat, lon, JourJulien + 1, psi_new, theta_infiltre_new);
 elapsed2 = toc;
 
 fprintf('\n=== Appel 2 (etat reutilise) ===\n');

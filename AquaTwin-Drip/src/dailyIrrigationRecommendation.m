@@ -1,7 +1,10 @@
-function [should_irrigate, duration_s, volume, soil_moisture, severe_stress, psi_new] = ...
-    dailyIrrigationRecommendation(culture, lat, lon, JourJulien, psi_old, pas_heure)
+function [should_irrigate, duration_s, volume, soil_moisture, severe_stress, psi_new, theta_infiltre_new] = ...
+    dailyIrrigationRecommendation(culture, lat, lon, JourJulien, psi_old, theta_infiltre, pas_heure)
 
-if nargin < 6 || isempty(pas_heure)
+if nargin < 6 || isempty(theta_infiltre)
+    theta_infiltre = 0; % meme valeur initiale que main.m avant sa boucle
+end
+if nargin < 7 || isempty(pas_heure)
     pas_heure = 1; % heures — meme valeur par defaut que les runs de main.m observes
 end
 
@@ -10,10 +13,12 @@ end
 % animations/tracés (Trace2D, Animation*, figure(100) manuelle), qui sont
 % pensés pour un affichage MATLAB interactif, pas pour un appel API.
 %
-% main.m original garde l'etat du sol (psi_old) en RAM entre deux passages
-% de boucle ; ici l'appelant (le backend) doit le persister et le
-% repasser au prochain appel pour le meme champ. Passer [] pour le tout
-% premier appel (utilise InitialSolution comme dans main.m).
+% main.m original garde l'etat du sol (psi_old ET theta_infiltre) en RAM
+% entre deux passages de boucle ; ici l'appelant (le backend) doit les
+% persister et les repasser au prochain appel pour le meme champ. Passer
+% psi_old=[] pour le tout premier appel (utilise InitialSolution comme
+% dans main.m) ; theta_infiltre=[] ou omis vaut alors 0, comme dans
+% main.m avant sa boucle.
 %
 % Cette fonction ne fait AUCUNE modification a la logique physique
 % d'origine : elle reprend les memes appels, dans le meme ordre, que le
@@ -43,7 +48,13 @@ end
 [dr,dz,ri,zi,zr,R] = coordonneesRacinaire(r,zmax,total_dof,JourJulien,culture);
 Theta_r = zeros(length(zi),1);
 
-Theta_root = TraceDeLaTeneurEnEauRacinaireVeri(Theta_r,repmat(psi_old,1,1),heure,culture,typeSol,lat,lon,T,RH,u2,Rs,alpha_vg,n_vg,m_vg,theta_s,theta_r,k_s);
+% Meme construction que main.m juste avant son appel a
+% TraceDeLaTeneurEnEauRacinaireVeri : une matrice [length(t) x total_dof],
+% seule la 1ere ligne (l'etat courant) est renseignee.
+Psi_solution = zeros(length(t), total_dof);
+Psi_solution(1,:) = psi_old + CalculTheta(theta_infiltre, lat, lon, alpha_vg, n_vg, m_vg, theta_s, theta_r, k_s);
+
+Theta_root = TraceDeLaTeneurEnEauRacinaireVeri(Theta_r,Psi_solution,heure,culture,typeSol,lat,lon,T,RH,u2,Rs,alpha_vg,n_vg,m_vg,theta_s,theta_r,k_s);
 [SH,Pt,k] = StresseHydriqueEtPotentielHydriqueVeri(Theta_root,heure,culture,typeSol,lat,lon,T,RH,u2,Rs,alpha_vg,n_vg,m_vg,theta_s,theta_r,k_s);
 
 if k ~= 1
@@ -55,6 +66,7 @@ if k ~= 1
     soil_moisture = mean(Theta_root);
     severe_stress = false;
     psi_new = psi_old;
+    theta_infiltre_new = theta_infiltre;
     return;
 end
 
@@ -79,8 +91,8 @@ soil_moisture = mean(Theta_root);
 severe_stress = mean(SH) > 0.5; % a affiner avec Alex : seuil provisoire
 
 Temps = heure + pas_heure;
-theta_infiltre = interp1(t_t, Theta_root, Temps);
-psi_new = psi_old + CalculTheta(theta_infiltre, lat, lon, alpha_vg, n_vg, m_vg, theta_s, theta_r, k_s);
+theta_infiltre_new = interp1(t_t, Theta_root, Temps);
+psi_new = psi_old + CalculTheta(theta_infiltre_new, lat, lon, alpha_vg, n_vg, m_vg, theta_s, theta_r, k_s);
 
 end
 
