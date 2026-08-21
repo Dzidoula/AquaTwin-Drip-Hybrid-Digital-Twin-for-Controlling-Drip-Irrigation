@@ -1,4 +1,4 @@
-function [T,V]=TempsEtVolumeEauNecessaireIrrigation(q_irr,total_dof,J,culture,typeSol,lat,lon,T,RH,u2,Rs,alpha_vg,n_vg,m_vg,theta_s,theta_r,k_s)
+function [T,V]=TempsEtVolumeEauNecessaireIrrigation(q_irr,total_dof,J,culture,typeSol,lat,lon,T,RH,u2,Rs,alpha_vg,n_vg,m_vg,theta_s,theta_r,k_s,psi_old)
 
     [X_all,Y_all,Xp,Yp,n_prim,n_dual,total_dof]=MeshGrid();
     [psi_omega,psi_c,psi_h,ro,A,d_r,phi]=parametresSource(total_dof,culture,typeSol);
@@ -6,7 +6,15 @@ function [T,V]=TempsEtVolumeEauNecessaireIrrigation(q_irr,total_dof,J,culture,ty
     [r_emitter, q_irr,Efficience]=parameterGoutteur();
     [h,r,zmax]=coordonnesPlot();
     [dr,dz,ri,zi,zr,R]=coordonneesRacinaire(r,zmax,total_dof,J,culture);
-    psi_old =InitialSolution(lat,lon,alpha_vg,n_vg, m_vg,theta_s, theta_r,k_s);
+    % `psi_old` optionnel (18e argument) pour les appelants (ex. l'API
+    % backend via dailyIrrigationRecommendation.m) qui font evoluer l'etat
+    % du sol jour apres jour : sans lui, on retombe sur le comportement
+    % d'origine (etat initial recalcule a chaque appel) pour ne pas casser
+    % les scripts historiques (main.m, Trace2D*, Animation2DIrrigation...)
+    % qui n'ont jamais fourni cet argument.
+    if nargin < 18 || isempty(psi_old)
+        psi_old =InitialSolution(lat,lon,alpha_vg,n_vg, m_vg,theta_s, theta_r,k_s);
+    end
     Psi_solution=zeros(length(zi),length(ri));
     Psi_solution(1,:)=psi_old(1);
     Theta = theta_func(Psi_solution);
