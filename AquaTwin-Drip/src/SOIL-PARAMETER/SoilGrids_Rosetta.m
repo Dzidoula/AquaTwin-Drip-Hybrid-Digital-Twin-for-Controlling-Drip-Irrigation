@@ -1,5 +1,36 @@
 function [theta_r,theta_s,alpha,n,Ks,Sand,Silt,Clay,BD] =SoilGrids_Rosetta(lat,lon)
 
+% CACHE LOCAL (I/O only, pas un changement scientifique) : classifySoilType.m
+% et vanMualemParametersValor.m appellent chacune cette fonction avec le meme
+% (lat,lon) — deux requetes ISRIC identiques et redondantes dans un seul
+% calcul — et le moteur est un process Octave neuf a chaque appel API, donc
+% sans ca on recontacte ISRIC tous les jours pour un sol qui ne change pas.
+% Cle arrondie a 3 decimales (~111m, plus grossier que la resolution de
+% SoilGrids ~250m) pour absorber le bruit flottant. `round(x,n)` a 2
+% arguments n'est pas supporte par cette version d'Octave (meme limitation
+% que dans classifySoilType.m) — d'ou round(x*1000)/1000.
+cache_path = fullfile(fileparts(mfilename('fullpath')), '.soilgrids_cache.json');
+lat_key = round(lat*1000)/1000;
+lon_key = round(lon*1000)/1000;
+
+if exist(cache_path, 'file')
+    try
+        cache_data = jsondecode(fileread(cache_path));
+        for i = 1:numel(cache_data)
+            entry = cache_data(i);
+            if abs(entry.lat - lat_key) < 1e-6 && abs(entry.lon - lon_key) < 1e-6
+                theta_r = entry.theta_r; theta_s = entry.theta_s; alpha = entry.alpha;
+                n = entry.n; Ks = entry.Ks; Sand = entry.Sand; Silt = entry.Silt;
+                Clay = entry.Clay; BD = entry.BD;
+                fprintf('SoilGrids/Rosetta : cache local pour (%.4f, %.4f), pas de requete ISRIC.\n', lat, lon);
+                return;
+            end
+        end
+    catch
+        % Cache illisible/corrompu : on l'ignore et on retombe sur le reseau.
+    end
+end
+
 % 1. SoilGrids API
 
 fprintf('Recherche pour lat=%.4f, lon=%.4f\n', lat, lon);
@@ -130,6 +161,24 @@ alpha   = X(3);
 n       = X(4);
 Ks      = X(5);
 
-
+% Ecriture du cache — best-effort : un souci d'ecriture ne doit jamais faire
+% echouer le calcul en cours, seulement priver les prochains appels du
+% raccourci.
+try
+    new_entry = struct('lat', lat_key, 'lon', lon_key, 'theta_r', theta_r, ...
+        'theta_s', theta_s, 'alpha', alpha, 'n', n, 'Ks', Ks, ...
+        'Sand', Sand, 'Silt', Silt, 'Clay', Clay, 'BD', BD);
+    if exist(cache_path, 'file')
+        existing = jsondecode(fileread(cache_path));
+        cache_data = [existing(:); new_entry];
+    else
+        cache_data = new_entry;
+    end
+    fid = fopen(cache_path, 'w');
+    fprintf(fid, '%s', jsonencode(cache_data));
+    fclose(fid);
+catch
+    % Ignoré délibérément — voir commentaire ci-dessus.
+end
 
 end
