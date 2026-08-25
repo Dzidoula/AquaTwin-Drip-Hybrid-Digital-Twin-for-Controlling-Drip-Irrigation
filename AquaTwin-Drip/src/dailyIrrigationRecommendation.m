@@ -1,11 +1,14 @@
 function [should_irrigate, duration_s, volume, soil_moisture, severe_stress, psi_new, theta_infiltre_new] = ...
-    dailyIrrigationRecommendation(culture, lat, lon, JourJulien, psi_old, theta_infiltre, pas_heure)
+    dailyIrrigationRecommendation(culture, lat, lon, JourJulien, psi_old, theta_infiltre, pas_heure, typeSol)
 
 if nargin < 6 || isempty(theta_infiltre)
     theta_infiltre = 0; % meme valeur initiale que main.m avant sa boucle
 end
 if nargin < 7 || isempty(pas_heure)
     pas_heure = 1; % heures — meme valeur par defaut que les runs de main.m observes
+end
+if nargin < 8
+    typeSol = [];
 end
 
 % Extraction, API-facing, de UNE seule iteration de la boucle de main.m —
@@ -24,7 +27,12 @@ end
 % d'origine : elle reprend les memes appels, dans le meme ordre, que le
 % corps de boucle de main.m.
 
-typeSol = classifySoilType(lat, lon);
+% Meme motif que main.m (lignes 7-9) : si l'appelant fournit deja typeSol
+% (ex. choisi par le fermier a l'inscription), on l'utilise directement et
+% on evite l'appel reseau a ISRIC. Sinon, on le derive comme avant.
+if isempty(typeSol)
+    typeSol = classifySoilType(lat, lon);
+end
 
 [X_all,Y_all,Xp,Yp,n_prim,n_dual,total_dof] = MeshGrid();
 [r_emitter, q_irr, Efficience] = parameterGoutteur();

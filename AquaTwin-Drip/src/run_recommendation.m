@@ -43,8 +43,18 @@ else
     theta_infiltre = 0;
 end
 
+% Farmer-supplied at onboarding (one of the 6 values TenseurSol.m switches
+% on); absent/empty means "je ne sais pas" — dailyIrrigationRecommendation
+% then falls back to classifySoilType (ISRIC) exactly as before this was
+% added.
+if isfield(input_json, 'type_sol') && ~isempty(input_json.type_sol)
+    typeSol = input_json.type_sol;
+else
+    typeSol = [];
+end
+
 [should_irrigate, duration_s, volume, soil_moisture, severe_stress, psi_new, theta_infiltre_new] = ...
-    dailyIrrigationRecommendation(culture, lat, lon, JourJulien, psi_old, theta_infiltre);
+    dailyIrrigationRecommendation(culture, lat, lon, JourJulien, psi_old, theta_infiltre, 1, typeSol);
 
 % `volume` (from TempsEtVolumeEauNecessaireIrrigation, via
 % parametresSource's `A = d_r*dl`) is the water volume for ONE emitter/plant,
