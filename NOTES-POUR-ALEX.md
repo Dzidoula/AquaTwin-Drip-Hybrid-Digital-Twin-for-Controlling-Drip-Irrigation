@@ -61,7 +61,28 @@ Après avoir branché iSDA en production, deux calculs réels ont été déclenc
 
 **Ce qui fonctionne bien, à noter** : la validation côté backend (`jobs.py`) a correctement détecté le `NaN` et marqué le job "failed" plutôt que d'afficher une fausse recommandation à l'agriculteur — le filet de sécurité fonctionne comme prévu.
 
-**Pas corrigé unilatéralement** : la robustesse numérique du solveur face à un `psi_old` réel (au lieu d'un état initial propre) est un sujet de fond, pas une coquille. Vaut le coup de creuser ensemble : le `psi_old` produit par un jour précédent respecte-t-il les mêmes contraintes/bornes que `InitialSolution` ? Le temps de calcul qui explose (26 min vs quelques secondes) suggère aussi que le solveur peine à converger dans ce cas, ce qui rejoint le point 14 plus bas (non-convergence pas remontée dans le JSON de sortie).
+**Pas corrigé unilatéralement** : la robustesse numérique du solveur face à un `psi_old` réel (au lieu d'un état initial propre) est un sujet de fond, pas une coquille. Le temps de calcul qui explose (26 min vs quelques secondes) suggère aussi que le solveur peine à converger dans ce cas, ce qui rejoint le point 14 plus bas (non-convergence pas remontée dans le JSON de sortie).
+
+### Cause identifiée précisément (accès direct à la base de test)
+
+Valeurs réelles lues dans la base pour ce champ, après le jour 1 :
+- `theta_infiltre` persisté = **0,003377**
+- `theta_r` (résiduel, dérivé d'iSDA/Rosetta pour ce sol) = **0,0114**
+
+`theta_infiltre < theta_r` : le sol se retrouve avec une teneur en eau *en dessous* de son minimum physique théorique. Dans `CalculTheta.m` :
+
+```matlab
+Se = (theta - theta_r) / (theta_s - theta_r);
+%% Verification
+%if Se <= 0 || Se >= 1
+    %error('Se doit etre entre 0 et 1');
+%end
+psi_sol = - ( (Se.^(-1/m_vg) - 1).^(1/n_vg) ) ./ alpha_vg;
+```
+
+Avec `theta_infiltre=0,003377`, `Se ≈ -0,0174` — **négatif**. `Se^(-1/m_vg)` élève un nombre négatif à une puissance non entière → résultat complexe/`NaN` en Octave. Cette valeur corrompt directement `Psi_solution(1,:)`, l'état de départ transmis au solveur pour le jour 2 — d'où le `NaN` final et les 26 minutes de calcul. La vérification qui aurait attrapé ce cas est présente dans le code mais **commentée**.
+
+**Ça remonte plus loin que le jour 2** : `theta_infiltre=0,003377` est lui-même le résultat brut du calcul du **jour 1** (`soil_moisture` du jour 1 était déjà ~0,34%, sous `theta_r`). Le vrai sujet n'est donc pas seulement "le solveur ne gère pas un psi_old réel" — c'est **pourquoi le jour 1 produit déjà une humidité sous le minimum physique du sol**. Deux pistes à trancher avec toi, pas devinées : (a) `theta_r` dérivé d'iSDA/Rosetta est-il correct pour ce type de sol, ou trop élevé ? (b) le calcul de `Theta_root`/`soil_moisture` lui-même a-t-il un problème indépendant qui le fait sous-estimer l'humidité ?
 
 ## 2. Autres bugs confirmés (audit du 26/08, pas encore corrigés)
 
