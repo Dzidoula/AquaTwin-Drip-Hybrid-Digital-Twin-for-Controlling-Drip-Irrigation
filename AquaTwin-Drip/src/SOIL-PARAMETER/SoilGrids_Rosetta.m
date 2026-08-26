@@ -31,62 +31,24 @@ if exist(cache_path, 'file')
     end
 end
 
-% 1. SoilGrids API
+% 1. Texture du sol (Sand/Silt/Clay/BD)
+%
+% SOURCE : iSDA Africa, PAS SoilGrids/ISRIC malgre le nom de ce fichier
+% (conserve pour eviter de casser classifySoilType.m/vanMualemParametersValor.m
+% qui l'appellent par ce nom). ISRIC SoilGrids renvoie systematiquement
+% "mean": null pour toute coordonnee africaine testee (voir isda_soil_texture.m
+% pour le detail complet et les tests effectues le 2026-08-26) — remplace
+% par iSDA Africa (https://api.isda-africa.com), qui repond de facon fiable
+% sur les memes coordonnees beninoises. A VALIDER AVEC ALEX : changement de
+% source de donnees (30m/iSDA vs 250m/SoilGrids), pas seulement un correctif
+% de robustesse — le calcul Rosetta en aval, lui, ne change pas.
 
-fprintf('Recherche pour lat=%.4f, lon=%.4f\n', lat, lon);
+fprintf('Recherche pour lat=%.4f, lon=%.4f (iSDA Africa)\n', lat, lon);
 
-url = sprintf([ ...
-'https://rest.isric.org/soilgrids/v2.0/properties/query' ...
-'?lon=%f&lat=%f' ...
-'&property=sand' ...
-'&property=silt' ...
-'&property=clay' ...
-'&property=bdod' ...
-'&depth=0-5cm' ...
-'&value=mean'], lon, lat);
-
-% `webread`/`weboptions` are broken in this GNU Octave build (fails even on
-% a plain, known-good JSON endpoint like api.github.com — not specific to
-% this URL). Replaced with a curl + jsondecode equivalent, which round-trips
-% to an identical struct. See branch README/PR description for details.
-[curl_status, curl_output] = system(['curl -s --max-time 240 "' url '"']);
-if curl_status ~= 0
-    error('Echec de la requete SoilGrids (curl status=%d) pour (%.4f, %.4f)', curl_status, lat, lon);
-end
-data = jsondecode(curl_output);
-
-% Extraction robuste
-Sand = NaN; Silt = NaN; Clay = NaN; BD = NaN;
-
-if isfield(data, 'properties') && isfield(data.properties, 'layers')
-    layers = data.properties.layers;
-    
-    for k = 1:length(layers)
-        name = lower(layers(k).name);
-        
-        if isfield(layers(k), 'depths') && isstruct(layers(k).depths)
-            if isfield(layers(k).depths, 'values') && isfield(layers(k).depths.values, 'mean')
-                value = layers(k).depths.values.mean;
-                
-                if ~isempty(value) && isnumeric(value) && ~isnan(double(value))
-                    switch name
-                        case 'sand'
-                            Sand = double(value) / 10;
-                        case 'silt'
-                            Silt = double(value) / 10;
-                        case 'clay'
-                            Clay = double(value) / 10;
-                        case 'bdod'
-                            BD = double(value) / 100;
-                    end
-                end
-            end
-        end
-    end
-end
+[Sand, Silt, Clay, BD] = isda_soil_texture(lat, lon);
 
 if any(isnan([Sand, Silt, Clay, BD]))
-    error('Aucune donn?e pour (%.4f, %.4f) - point probablement oc?anique', lat, lon);
+    error('Aucune donnee iSDA Africa pour (%.4f, %.4f)', lat, lon);
 end
 
 fprintf('Sable: %.1f%%, Limon: %.1f%%, Argile: %.1f%%, BD: %.3f g/cm3\n', ...
