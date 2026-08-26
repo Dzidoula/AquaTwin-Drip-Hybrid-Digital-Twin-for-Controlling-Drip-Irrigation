@@ -339,7 +339,15 @@ function [solution, Erreur]=DDFVRichardIrrigationAPI(psi_old,J,culture,typeSol,l
             psi_new=psi_current +psi_inc ;
 
             %% VERIFICATION DE LA CONVERGENCE A CAUSE DE LA METHODE D'ITERATION DE PICARD POUR LA NON-LINEARITE
-            err = norm(psi_new - psi_inc);
+            % BUG CORRIGE : comparait psi_new a psi_inc, alors que
+            % psi_new = psi_current + psi_inc par construction (ligne
+            % ci-dessus) — donc `psi_new - psi_inc` valait toujours
+            % psi_current, quel que soit l'ecart reel entre deux iterations.
+            % Le critere de convergence de Picard ne mesurait donc rien de
+            % pertinent (d'ou "convergence non atteinte" quasi systematique).
+            % Formule correcte deja utilisee dans DDFVRichardIrrigation.m
+            % (la variante sans meteo) : comparer aux iterations successives.
+            err = norm(psi_new - psi_current);
             erreur = err / (norm(psi_new) + eps);
             
             if erreur <tol && iter< max_iter
