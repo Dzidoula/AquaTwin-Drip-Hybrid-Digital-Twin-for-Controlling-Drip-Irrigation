@@ -48,6 +48,21 @@ Toutes les requêtes ont réussi, nord comme sud du pays.
 - **iSDA (30m) n'est pas la même source que SoilGrids (250m)** — méthodologie de calibration différente. Les valeurs numériques peuvent légèrement s'écarter de ce que SoilGrids aurait donné pour le même point. C'est un changement de source de données, pas juste un correctif de robustesse.
 - **`vanMualemParametersValor.m` reste appelé sans condition**, même quand l'agriculteur a choisi un type de sol à l'inscription (voir point 2). Ce changement rend cet appel fiable au lieu de planter — mais ne règle pas la question de fond : faut-il l'éviter complètement dans ce cas, avec des paramètres van Genuchten représentatifs par catégorie de sol au lieu de la valeur précise dérivée d'iSDA/Rosetta ?
 
+## 1bis. Nouveau, trouvé en testant le remplacement iSDA en production — solveur instable sur un `psi_old` réel (jour 2)
+
+Après avoir branché iSDA en production, deux calculs réels ont été déclenchés sur le même champ de test (Bohicon), à la suite :
+
+- **Jour 1** (`psi_old` vide, `InitialSolution` comme tout premier calcul) : réussi en 39s, résultat complet et cohérent.
+- **Jour 2** (`psi_old` réel repris du résultat du jour 1, via la persistance déjà en place côté backend) : a pris **26 minutes** (au lieu de quelques secondes/minutes), puis a échoué avec `soil_moisture` manquant (`NaN`).
+
+`soil_moisture = mean(Theta_root)` (`dailyIrrigationRecommendation.m:98`) est calculé **avant** le bloc `interp1` heures/secondes déjà documenté (point 3 plus bas) — donc ce n'est pas exactement ce bug-là, même si c'est apparenté (les deux viennent du même `Theta_root`). `Theta_root` contient un `NaN` quelque part quand le calcul part d'un `psi_old` réel plutôt que de `InitialSolution`.
+
+**Pourquoi ce n'est découvert que maintenant** : tant qu'ISRIC échouait pour toute coordonnée africaine, aucun calcul réel n'avait jamais atteint un vrai "jour 2" en production avec un `psi_old` non vide — tous les tests précédents (y compris les miens en Docker) redémarraient de `InitialSolution` à chaque fois. Le remplacement par iSDA a permis au premier vrai enchaînement jour 1 → jour 2 d'avoir lieu, et c'est précisément ce chemin qui casse.
+
+**Ce qui fonctionne bien, à noter** : la validation côté backend (`jobs.py`) a correctement détecté le `NaN` et marqué le job "failed" plutôt que d'afficher une fausse recommandation à l'agriculteur — le filet de sécurité fonctionne comme prévu.
+
+**Pas corrigé unilatéralement** : la robustesse numérique du solveur face à un `psi_old` réel (au lieu d'un état initial propre) est un sujet de fond, pas une coquille. Vaut le coup de creuser ensemble : le `psi_old` produit par un jour précédent respecte-t-il les mêmes contraintes/bornes que `InitialSolution` ? Le temps de calcul qui explose (26 min vs quelques secondes) suggère aussi que le solveur peine à converger dans ce cas, ce qui rejoint le point 14 plus bas (non-convergence pas remontée dans le JSON de sortie).
+
 ## 2. Autres bugs confirmés (audit du 26/08, pas encore corrigés)
 
 Ordonnés par sévérité. Aucun n'a été corrigé unilatéralement — ce sont des choix scientifiques, pas des coquilles évidentes.
