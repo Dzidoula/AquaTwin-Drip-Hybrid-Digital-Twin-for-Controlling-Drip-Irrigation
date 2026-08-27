@@ -84,6 +84,25 @@ Avec `theta_infiltre=0,003377`, `Se ≈ -0,0174` — **négatif**. `Se^(-1/m_vg)
 
 **Ça remonte plus loin que le jour 2** : `theta_infiltre=0,003377` est lui-même le résultat brut du calcul du **jour 1** (`soil_moisture` du jour 1 était déjà ~0,34%, sous `theta_r`). Le vrai sujet n'est donc pas seulement "le solveur ne gère pas un psi_old réel" — c'est **pourquoi le jour 1 produit déjà une humidité sous le minimum physique du sol**. Deux pistes à trancher avec toi, pas devinées : (a) `theta_r` dérivé d'iSDA/Rosetta est-il correct pour ce type de sol, ou trop élevé ? (b) le calcul de `Theta_root`/`soil_moisture` lui-même a-t-il un problème indépendant qui le fait sous-estimer l'humidité ?
 
+### Piste mécanique trouvée dans `TraceDeLaTeneurEnEauRacinaireVeri.m`
+
+En relisant ton mémoire (§4.1.1, la remarque sur la pondération par `r` "cruciale" pour la géométrie axisymétrique) et en reprenant le code ligne par ligne, deux choses sautent aux yeux dans le calcul de `Theta_root` :
+
+```matlab
+Theta = theta_func(Psi_solution);          % ligne 12 - formule directe van Genuchten,
+                                             % bornee mathematiquement dans [theta_r, theta_s]
+for j = 1:length(ri)-1                      % ligne 20 - s'arrete a length(ri)-1, pas length(ri)
+    theta_mean = theta_mean + Theta(i,j) * ri(j) * dr * dz;
+end
+theta_root = (2/(R^2 * zr)) * theta_mean;   % ligne 24 - normalisation ANALYTIQUE continue (integrale r dr = R^2/2)
+Theta_root(i) = theta_root + Theta_r(i);    % ligne 25
+```
+
+1. La somme discrète (ligne 20) s'arrête à `length(ri)-1`, excluant le dernier point radial, alors que le facteur de normalisation (ligne 24) est la formule analytique continue `2/R²` qui suppose une couverture complète du domaine `[0,R]`. Ce décalage discret/continu peut faire sortir la "moyenne" pondérée de son intervalle physique légitime `[θr, θs]` — y compris en dessous de `θr`, ce qui correspond exactement à l'observation (`theta_infiltre=0,0034 < theta_r=0,0114`). Comme `Theta(i,j)` lui-même est correctement borné (ligne 12), la seule façon d'obtenir `Theta_root` hors bornes est une erreur dans l'agrégation/normalisation, pas dans la physique ponctuelle.
+2. Ligne 25 additionne `Theta_r(i)` — un paramètre au nom quasi identique à `theta_r` (résiduel, minuscule) mais qui est un tableau distinct, toujours initialisé à zéro par l'appelant (`Theta_r = zeros(length(zi),1);` dans `dailyIrrigationRecommendation.m:58`). Actuellement inerte (+0), donc pas la cause du bug observé, mais ressemble à un état accumulé jamais branché ou à du code mort — vaut la peine de vérifier l'intention initiale.
+
+Pas corrigé unilatéralement : la convention de maillage voulue pour `ri` (nœud-centré vs arête-centrée) qui justifierait ou non l'exclusion du dernier point à la ligne 20 est une question de convention numérique à trancher avec toi, pas une coquille évidente à corriger à l'aveugle.
+
 ## 2. Autres bugs confirmés (audit du 26/08, pas encore corrigés)
 
 Ordonnés par sévérité. Aucun n'a été corrigé unilatéralement — ce sont des choix scientifiques, pas des coquilles évidentes.
