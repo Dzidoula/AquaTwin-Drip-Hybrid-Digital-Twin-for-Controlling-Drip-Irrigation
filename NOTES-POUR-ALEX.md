@@ -123,6 +123,19 @@ Ordonnés par sévérité. Aucun n'a été corrigé unilatéralement — ce sont
 14. **La non-convergence n'est toujours pas remontée à l'API** : même après la correction du point 13, un run qui ne converge pas en 30 itérations continue avec le dernier `psi_new` sans exception ni indicateur dans le JSON de sortie — indissociable d'un run correct côté API. Vaudrait le coup d'exporter `Erreur`/un indicateur de convergence.
 15. **Volume par plant vs par parcelle** (déjà contourné en aval, FYI) : `parametresSource.m` calcule pour un seul plant, pas tout le champ. Contourné dans `run_recommendation.m` sans toucher aux fichiers partagés avec `main.m`.
 
+## Pourquoi 0-5cm ? — un seul échantillon de surface pour tout le profil
+
+En cherchant dans tout le code et dans le mémoire, aucune justification pour le choix de la profondeur `0-5cm` dans la requête SoilGrids/iSDA — c'est un littéral brut depuis ton tout premier commit, sans commentaire.
+
+Plus important que le choix lui-même : ce seul échantillon de surface paramètre **tout le profil simulé**.
+- `coordonnesPlot.m` : le domaine va jusqu'à `zmax=0.8` (80 cm)
+- `profondeurRacinaire.m` : racines jusqu'à 1,20 m (maïs), 1,50 m (coton)
+- `DDFVRichardIrrigationAPI.m:23` : `theta_s`, `theta_r`, `alpha_vg`, `n_vg`, `k_s` sont des scalaires uniques (pas un profil par couche), appliqués uniformément sur tout le maillage 2D
+
+Donc la texture de surface (souvent la plus sableuse/organique, la moins représentative du sous-sol) définit le comportement hydraulique jusqu'à 1 m de profondeur, y compris là où les racines cherchent réellement l'eau. C'est en tension avec la critique du §1.2.3 de ton mémoire sur l'homogénéité par couches du modèle "bucket" d'AquaCrop — le solveur Richards actuel utilise une seule valeur pour tout le profil, pas même plusieurs couches homogènes.
+
+Pas corrigé, pas tranché : est-ce un raccourci volontaire (donnée limitée, simplicité) ou un oubli ? Et si on veut améliorer, à quelle profondeur (ou quelle moyenne pondérée sur plusieurs couches) faudrait-il échantillonner pour représenter la zone racinaire réelle ?
+
 ## Statut du dépôt README
 
 Le README affiche "Validation par données expérimentales : ✅ Implémenté", mais aucune trace de validation/benchmark trouvée dans le code. Le sommaire du README promet aussi des sections ("Validation et benchmarks", "Structure du dépôt", "Équipe", "Licence", "Références") qui n'existent pas — le fichier semble tronqué en plein milieu de la section "Installation". Il annonce aussi MATLAB R2020b+/R2024a, mais `dailyIrrigationRecommendation.m` contient un contournement propre à Octave (`datenum2hour()`) — l'exécution réelle est Octave, pas MATLAB.
