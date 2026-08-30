@@ -21,12 +21,33 @@ function [SH, Pt, t, Theta_root] = TraceTeneurEnEauRacinaireStresseHydriqueEtPot
     t = t + tr;
 
     % Calcul de la teneur en eau moyenne racinaire
+    %
+    % BUG CORRIGE (verifie numeriquement sur un vrai calcul, voir NOTES-POUR-
+    % ALEX.md) : `theta_mean` inclut un facteur `dz` (ligne du dessous),
+    % mais l'ancienne normalisation `2/(R^2*max(zr))` ne le compense pas —
+    % dz ne s'annule jamais. De plus `zr` (profondeur racinaire) n'a pas sa
+    % place ici : cette boucle calcule une moyenne radiale a UNE profondeur
+    % z fixee (theta_func(:,j) pour cette ligne i seulement, jamais cumulee
+    % sur z), pas une moyenne sur toute la zone racinaire.
+    % theta_func(psi) est bornee mathematiquement dans [theta_r, theta_s]
+    % (van Genuchten), donc toute vraie moyenne ponderee de valeurs de ce
+    % champ doit aussi y rester — l'ancienne formule sortait de cette plage
+    % (0.0044 mesure pour theta_r=0.0114), ce qui est mathematiquement
+    % impossible pour une moyenne ponderee a poids positifs. En divisant
+    % par la somme reelle des poids utilises (`weight_sum`) au lieu d'une
+    % constante analytique qui ne correspond pas a ce qui est reellement
+    % somme, `theta_root` redevient une vraie moyenne ponderee — garantie
+    % dans [theta_r, theta_s] par construction, quels que soient le
+    % maillage ou la resolution.
     for i = 1:length(zi)
         theta_mean = 0;
+        weight_sum = 0;
         for j = 1:length(ri)-1
-            theta_mean = theta_mean + Theta(i, j) * ri(j) * dr * dz
+            w = ri(j) * dr * dz;
+            theta_mean = theta_mean + Theta(i, j) * w;
+            weight_sum = weight_sum + w;
         end
-        theta_root = (2/((R^2) * max(zr)))* theta_mean;
+        theta_root = theta_mean / weight_sum;
         Theta_root(i) = theta_root;
     end
 

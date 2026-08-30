@@ -13,15 +13,27 @@ Theta = theta_func(Psi_solution);
 Theta_root = zeros(length(zi),1);
 
 
+% BUG CORRIGE (meme defaut que TraceTeneurEnEauRacinaireStresseHydriqueEt-
+% PotentielHydrique_.m, verifie numeriquement — voir NOTES-POUR-ALEX.md) :
+% `theta_mean` inclut un facteur `dz` jamais annule par l'ancienne
+% normalisation `2/(R^2*zr)`, et `zr` n'a pas sa place dans une moyenne a
+% une seule profondeur z fixee. theta_func(psi) est bornee dans
+% [theta_r, theta_s] par construction (van Genuchten) ; diviser par la
+% somme reelle des poids utilises (`weight_sum`) au lieu d'une constante
+% analytique qui ne correspond pas a ce qui est reellement somme rend
+% `theta_root` a nouveau garanti dans cette plage.
 for i = 1:length(zi)
 
     theta_mean = 0;   % RESET REQUIRED
+    weight_sum = 0;
 
     for j = 1:length(ri)-1
-        theta_mean = theta_mean + Theta(i,j) * ri(j) * dr * dz;
+        w = ri(j) * dr * dz;
+        theta_mean = theta_mean + Theta(i,j) * w;
+        weight_sum = weight_sum + w;
     end
 
-    theta_root = (2/(R^2 * zr)) * theta_mean;
+    theta_root = theta_mean / weight_sum;
     Theta_root(i) = theta_root+Theta_r(i);
 
 end
