@@ -48,7 +48,9 @@ Toutes les requêtes ont réussi, nord comme sud du pays.
 - **iSDA (30m) n'est pas la même source que SoilGrids (250m)** — méthodologie de calibration différente. Les valeurs numériques peuvent légèrement s'écarter de ce que SoilGrids aurait donné pour le même point. C'est un changement de source de données, pas juste un correctif de robustesse.
 - **`vanMualemParametersValor.m` reste appelé sans condition**, même quand l'agriculteur a choisi un type de sol à l'inscription (voir point 2). Ce changement rend cet appel fiable au lieu de planter — mais ne règle pas la question de fond : faut-il l'éviter complètement dans ce cas, avec des paramètres van Genuchten représentatifs par catégorie de sol au lieu de la valeur précise dérivée d'iSDA/Rosetta ?
 
-## 1bis. Nouveau, trouvé en testant le remplacement iSDA en production — solveur instable sur un `psi_old` réel (jour 2)
+## 1bis. RÉSOLU — trouvé en testant le remplacement iSDA en production, solveur instable sur un `psi_old` réel (jour 2)
+
+**Mise à jour : corrigé et vérifié de bout en bout, voir la section "CORRIGÉ" plus bas.** Le récit ci-dessous est laissé tel quel pour la trace du diagnostic.
 
 Après avoir branché iSDA en production, deux calculs réels ont été déclenchés sur le même champ de test (Bohicon), à la suite :
 
@@ -84,24 +86,38 @@ Avec `theta_infiltre=0,003377`, `Se ≈ -0,0174` — **négatif**. `Se^(-1/m_vg)
 
 **Ça remonte plus loin que le jour 2** : `theta_infiltre=0,003377` est lui-même le résultat brut du calcul du **jour 1** (`soil_moisture` du jour 1 était déjà ~0,34%, sous `theta_r`). Le vrai sujet n'est donc pas seulement "le solveur ne gère pas un psi_old réel" — c'est **pourquoi le jour 1 produit déjà une humidité sous le minimum physique du sol**. Deux pistes à trancher avec toi, pas devinées : (a) `theta_r` dérivé d'iSDA/Rosetta est-il correct pour ce type de sol, ou trop élevé ? (b) le calcul de `Theta_root`/`soil_moisture` lui-même a-t-il un problème indépendant qui le fait sous-estimer l'humidité ?
 
-### Piste mécanique trouvée dans `TraceDeLaTeneurEnEauRacinaireVeri.m`
+### CORRIGÉ — cause confirmée avec de vrais chiffres, testée de bout en bout
 
-En relisant ton mémoire (§4.1.1, la remarque sur la pondération par `r` "cruciale" pour la géométrie axisymétrique) et en reprenant le code ligne par ligne, deux choses sautent aux yeux dans le calcul de `Theta_root` :
+En relisant ton mémoire (§4.1.1, la remarque sur la pondération par `r` "cruciale" pour la géométrie axisymétrique) et en instrumentant le calcul avec de vraies valeurs (Docker, coordonnée réelle), la cause est confirmée précisément — pas juste une hypothèse cette fois.
+
+Le vrai coupable : `TraceTeneurEnEauRacinaireStresseHydriqueEtPotentielHydrique_.m` (celui réellement exécuté dans le chemin météo, `T>=0` — pas `TraceDeLaTeneurEnEauRacinaireVeri.m` que j'avais d'abord soupçonné à tort, qui a le même défaut mais n'est utilisé que dans le repli `T<0`). Les deux fichiers partagent le même calcul :
 
 ```matlab
-Theta = theta_func(Psi_solution);          % ligne 12 - formule directe van Genuchten,
-                                             % bornee mathematiquement dans [theta_r, theta_s]
-for j = 1:length(ri)-1                      % ligne 20 - s'arrete a length(ri)-1, pas length(ri)
-    theta_mean = theta_mean + Theta(i,j) * ri(j) * dr * dz;
+Theta = theta_func(Psi_solution);            % bornee mathematiquement dans [theta_r, theta_s]
+for j = 1:length(ri)-1
+    theta_mean = theta_mean + Theta(i,j) * ri(j) * dr * dz;   % <- contient dz
 end
-theta_root = (2/(R^2 * zr)) * theta_mean;   % ligne 24 - normalisation ANALYTIQUE continue (integrale r dr = R^2/2)
-Theta_root(i) = theta_root + Theta_r(i);    % ligne 25
+theta_root = (2/(R^2 * zr)) * theta_mean;    % <- ne compense jamais dz, et zr n'a rien a faire ici
 ```
 
-1. La somme discrète (ligne 20) s'arrête à `length(ri)-1`, excluant le dernier point radial, alors que le facteur de normalisation (ligne 24) est la formule analytique continue `2/R²` qui suppose une couverture complète du domaine `[0,R]`. Ce décalage discret/continu peut faire sortir la "moyenne" pondérée de son intervalle physique légitime `[θr, θs]` — y compris en dessous de `θr`, ce qui correspond exactement à l'observation (`theta_infiltre=0,0034 < theta_r=0,0114`). Comme `Theta(i,j)` lui-même est correctement borné (ligne 12), la seule façon d'obtenir `Theta_root` hors bornes est une erreur dans l'agrégation/normalisation, pas dans la physique ponctuelle.
-2. Ligne 25 additionne `Theta_r(i)` — un paramètre au nom quasi identique à `theta_r` (résiduel, minuscule) mais qui est un tableau distinct, toujours initialisé à zéro par l'appelant (`Theta_r = zeros(length(zi),1);` dans `dailyIrrigationRecommendation.m:58`). Actuellement inerte (+0), donc pas la cause du bug observé, mais ressemble à un état accumulé jamais branché ou à du code mort — vaut la peine de vérifier l'intention initiale.
+**Mesuré sur un vrai calcul** (Bohicon, 6.3703/2.3912) : la somme des poids réellement utilisés (`Σ ri(j)*dr*dz`) vaut **4,50e-4**, alors que l'ancienne formule suppose implicitement une normalisation de **0,125** (`R²/2`) — un écart de facteur **~277×**, pas un simple effet de bord d'intégration numérique (ça, ce n'est que ~0,45% avec ce maillage). La vraie cause : `theta_mean` contient un facteur `dz` que la normalisation ne compense **jamais** ; et `zr` (profondeur racinaire) n'a rien à faire dans cette formule, puisque la boucle calcule une moyenne radiale à **une seule profondeur `z` fixée** (elle ne s'accumule jamais sur plusieurs profondeurs).
 
-Pas corrigé unilatéralement : la convention de maillage voulue pour `ri` (nœud-centré vs arête-centrée) qui justifierait ou non l'exclusion du dernier point à la ligne 20 est une question de convention numérique à trancher avec toi, pas une coquille évidente à corriger à l'aveugle.
+Comme `theta_func(psi)` est bornée dans `[θr, θs]` par construction (van Genuchten), **toute vraie moyenne pondérée** de ce champ doit forcément y rester aussi — l'ancienne formule sortait de cette plage, ce qui est mathématiquement impossible pour une moyenne à poids positifs, et confirme que le bug est dans l'agrégation, pas dans la physique ponctuelle.
+
+**Correction appliquée** (poussée, `a60e43d`) : diviser par la somme réelle des poids utilisés au lieu de la constante analytique :
+```matlab
+theta_root = theta_mean / weight_sum;   % weight_sum = somme reelle des ri(j)*dr*dz utilises
+```
+Ça rend `theta_root` garanti dans `[θr, θs]`, quel que soit le maillage.
+
+**Vérifié de bout en bout** (jour 1 → jour 2, même champ) :
+```
+JOUR1  soil_moisture=0.287542  theta_infiltre_new=0.287542
+JOUR2  soil_moisture=0.245390  theta_infiltre_new=0.245389  severe=0
+```
+Les deux jours se terminent avec un résultat valide, sans `NaN`, sans le blocage de 26 minutes — le jour 2 convergeait normalement (170,8s, convergence à l'itération 1 sur les 222 pas). Le blocage jour-2 est résolu.
+
+**Encore ouvert, pas tranché par nous** : est-ce que `0,29`/`0,25` (humidité proche de la saturation, `θs=0,47`) est une valeur *physiquement plausible* pour ces conditions (sol sableux, juste après irrigation), ou est-ce que ça révèle un autre écart (ex. `theta_r`/`theta_s` dérivés d'iSDA trop resserrés, ou une irrigation qui sursature le sol) ? On n'a pas de terrain réel pour comparer — ta lecture serait précieuse ici. Le point de code mort signalé précédemment (`Theta_r(i)` toujours à zéro, ligne 25 de `TraceDeLaTeneurEnEauRacinaireVeri.m`) reste aussi non tranché.
 
 ## 2. Autres bugs confirmés (audit du 26/08, pas encore corrigés)
 
