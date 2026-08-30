@@ -1,4 +1,4 @@
-function [should_irrigate, duration_s, volume, soil_moisture, severe_stress, psi_new, theta_infiltre_new] = ...
+function [should_irrigate, duration_s, volume, soil_moisture, severe_stress, psi_new, theta_infiltre_new, animation] = ...
     dailyIrrigationRecommendation(culture, lat, lon, JourJulien, psi_old, theta_infiltre, pas_heure, typeSol)
 
 if nargin < 6 || isempty(theta_infiltre)
@@ -75,6 +75,7 @@ if k ~= 1
     severe_stress = false;
     psi_new = psi_old;
     theta_infiltre_new = theta_infiltre;
+    animation = struct('frames', {{}});
     return;
 end
 
@@ -83,6 +84,12 @@ if (T < 0)
 else
     [solution, Erreur] = DDFVRichardIrrigationAPI(psi_old,heure,culture,typeSol,lat,lon,Tmax,T,RH,u2,Rs,alpha_vg,n_vg,m_vg,theta_s,theta_r,k_s);
 end
+
+% Images de l'evolution du bulbe d'humectation pour l'animation cote appli
+% — voir export_animation_frames.m. Ne depend que de `solution` (deja
+% calcule ci-dessus) et des parametres de sol ; aucun impact sur le reste
+% du calcul.
+animation = export_animation_frames(solution, alpha_vg, n_vg, m_vg, theta_s, theta_r, k_s);
 
 ETo = CalculEvapotranspirationJournaliere(heure,culture,typeSol,lat,lon,T,RH,u2,Rs);
 Tpot = TranspirationPotentielle(max(ETo),heure,culture);

@@ -53,7 +53,7 @@ else
     typeSol = [];
 end
 
-[should_irrigate, duration_s, volume, soil_moisture, severe_stress, psi_new, theta_infiltre_new] = ...
+[should_irrigate, duration_s, volume, soil_moisture, severe_stress, psi_new, theta_infiltre_new, animation] = ...
     dailyIrrigationRecommendation(culture, lat, lon, JourJulien, psi_old, theta_infiltre, 1, typeSol);
 
 % `volume` (from TempsEtVolumeEauNecessaireIrrigation, via
@@ -84,6 +84,13 @@ result.severe_stress = logical(severe_stress);
 result.psi_old = psi_new(:)';
 result.theta_infiltre = double(theta_infiltre_new);
 result.jour_julien = JourJulien + 1;
+
+% Images du bulbe d'humectation pour l'animation cote appli — voir
+% export_animation_frames.m. `animation.frames` est un cell vide quand il
+% n'y avait pas d'irrigation a faire aujourd'hui (rien a animer ce jour-la).
+if isfield(animation, 'frames') && ~isempty(animation.frames)
+    result.animation = animation;
+end
 
 fid = fopen(output_path, 'w');
 fprintf(fid, '%s', jsonencode(result));
