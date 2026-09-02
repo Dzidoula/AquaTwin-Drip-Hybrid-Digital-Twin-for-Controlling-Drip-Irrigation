@@ -1,4 +1,4 @@
-function animation = export_animation_frames(solution, alpha_vg, n_vg, m_vg, theta_s, theta_r, k_s, n_frames_out, grid_res)
+function animation = export_animation_frames(solution, alpha_vg, n_vg, m_vg, theta_s, theta_r, k_s, t, n_frames_out, grid_res)
 % Exporte des images pretes a etre affichees (grille reguliere de teneur en
 % eau interpolee) pour l'animation du bulbe d'humectation cote appli.
 %
@@ -20,10 +20,10 @@ function animation = export_animation_frames(solution, alpha_vg, n_vg, m_vg, the
 % Ne change RIEN a la physique : `solution` (sortie du solveur de Richards,
 % DDFVRichardIrrigationAPI/DDFVRichardIrrigation) est prise telle quelle.
 
-if nargin < 8 || isempty(n_frames_out)
+if nargin < 9 || isempty(n_frames_out)
     n_frames_out = 12;
 end
-if nargin < 9 || isempty(grid_res)
+if nargin < 10 || isempty(grid_res)
     grid_res = 32;
 end
 
@@ -64,7 +64,8 @@ for k = 1:numel(indices)
     Teneur_interp(isnan(Teneur_interp)) = theta_r;
 
     frames{k} = Teneur_interp;
-    times(k) = nt; % index de pas de temps ; le vecteur t (secondes) est deja connu de l'appelant
+    times(k) = t(nt); % temps reel ecoule (s), meme convention que le titre
+                       % 'Drip Irrigation : t = ...' d'Animation2DIrrigation.m
 end
 
 animation = struct();
@@ -74,7 +75,7 @@ animation.r_emitter = r_emitter;
 animation.theta_r = theta_r;
 animation.theta_s = theta_s;
 animation.grid_res = grid_res;
-animation.frame_time_indices = times;
+animation.frame_times_s = times;
 animation.frames = frames;
 
 end

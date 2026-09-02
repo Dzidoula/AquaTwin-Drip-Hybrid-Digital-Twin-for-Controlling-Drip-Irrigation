@@ -89,7 +89,7 @@ end
 % — voir export_animation_frames.m. Ne depend que de `solution` (deja
 % calcule ci-dessus) et des parametres de sol ; aucun impact sur le reste
 % du calcul.
-animation = export_animation_frames(solution, alpha_vg, n_vg, m_vg, theta_s, theta_r, k_s);
+animation = export_animation_frames(solution, alpha_vg, n_vg, m_vg, theta_s, theta_r, k_s, t);
 
 ETo = CalculEvapotranspirationJournaliere(heure,culture,typeSol,lat,lon,T,RH,u2,Rs);
 Tpot = TranspirationPotentielle(max(ETo),heure,culture);
