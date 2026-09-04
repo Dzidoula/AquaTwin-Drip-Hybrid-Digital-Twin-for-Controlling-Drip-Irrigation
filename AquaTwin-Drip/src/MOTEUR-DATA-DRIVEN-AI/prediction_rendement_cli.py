@@ -19,6 +19,17 @@ import sys
 from PredictionRendementTest import PredictionRendementTest
 
 
+def _as_list(value):
+    """Octave's jsonencode serializes a 1-element numeric vector as a bare
+    JSON scalar, not a single-element array (the same quirk documented on
+    the app side, see WettingBulbAnimation._numList) — v_a_predire is
+    exactly 1 element whenever only one day is tested in the Prévisions
+    screen. PredictionRendementTest then iterates over it (`for x in
+    V_a_predire`), which raises on a plain int/float. Normalize here
+    rather than in PredictionRendementTest.py itself (Alex's file)."""
+    return value if isinstance(value, list) else [value]
+
+
 def main():
     if len(sys.argv) != 3:
         print("usage: prediction_rendement_cli.py <input.json> <output.json>", file=sys.stderr)
@@ -29,7 +40,7 @@ def main():
         params = json.load(f)
 
     predicted = PredictionRendementTest(
-        params["eto"], params["rendement"], params["v_a_predire"]
+        _as_list(params["eto"]), _as_list(params["rendement"]), _as_list(params["v_a_predire"])
     )
 
     with open(output_path, "w") as f:
