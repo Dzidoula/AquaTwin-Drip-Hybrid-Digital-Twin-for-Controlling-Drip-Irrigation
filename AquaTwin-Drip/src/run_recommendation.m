@@ -53,7 +53,7 @@ else
     typeSol = [];
 end
 
-[should_irrigate, duration_s, volume, soil_moisture, severe_stress, psi_new, theta_infiltre_new, animation] = ...
+[should_irrigate, duration_s, volume, soil_moisture, severe_stress, psi_new, theta_infiltre_new, animation, eto_mm_jour, pluie_48h_mm] = ...
     dailyIrrigationRecommendation(culture, lat, lon, JourJulien, psi_old, theta_infiltre, 1, typeSol);
 
 % `volume` (from TempsEtVolumeEauNecessaireIrrigation, via
@@ -84,6 +84,21 @@ result.severe_stress = logical(severe_stress);
 result.psi_old = psi_new(:)';
 result.theta_infiltre = double(theta_infiltre_new);
 result.jour_julien = JourJulien + 1;
+
+% Cartes ETO/PLUIE 48H du Home cote appli — [] (Open-Meteo indisponible)
+% encode en JSON comme un tableau vide, jamais comme `null`, donc on passe
+% explicitement par NaN dans ce cas pour que jsonencode produise bien
+% `null` (coherent avec le reste des champs numeriques optionnels).
+if isempty(eto_mm_jour)
+    result.eto_mm_jour = NaN;
+else
+    result.eto_mm_jour = double(eto_mm_jour);
+end
+if isempty(pluie_48h_mm)
+    result.pluie_48h_mm = NaN;
+else
+    result.pluie_48h_mm = double(pluie_48h_mm);
+end
 
 % Images du bulbe d'humectation pour l'animation cote appli — voir
 % export_animation_frames.m. `animation.frames` est un cell vide quand il

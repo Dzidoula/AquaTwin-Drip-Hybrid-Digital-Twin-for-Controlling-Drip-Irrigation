@@ -1,4 +1,8 @@
-function [T,RH,u2,Rs]=DataEvapotranspiration(lat,lon)
+function [T,RH,u2,Rs,P]=DataEvapotranspiration(lat,lon)
+% `P` (precipitation horaire, mm) — 5e sortie optionnelle ajoutee pour
+% l'affichage "Pluie 48h" cote appli ; ne change rien pour les appelants
+% existants qui ne recuperent que [T,RH,u2,Rs] (Octave n'exige pas que
+% l'appelant capture toutes les sorties definies par la fonction).
 
     try
 
@@ -8,7 +12,8 @@ function [T,RH,u2,Rs]=DataEvapotranspiration(lat,lon)
         'temperature_2m,',...
         'relative_humidity_2m,',...
         'wind_speed_10m,',...
-        'shortwave_radiation'],...
+        'shortwave_radiation,',...
+        'precipitation'],...
         lat,...
         lon);
 
@@ -26,16 +31,18 @@ function [T,RH,u2,Rs]=DataEvapotranspiration(lat,lon)
         RH =json.hourly.relative_humidity_2m;
         u10 =json.hourly.wind_speed_10m;
         Rs =json.hourly.shortwave_radiation;
+        P =json.hourly.precipitation;
 
         % Conversion vent 10m -> 2m
         u2 =u10*4.87./log(67.8*10-5.42);
-        
+
     catch
         warning('Open-Meteo unavailable, using default initial pressure head');
         T=-28;
         RH=-70;
         u2=-2;
         Rs=-18;
+        P=[]; % pas de sentinelle numerique ici : P n'entre dans aucun branchement T<0/T>=0, un tableau vide suffit a signaler "pas de donnee" a l'appelant.
     end
 
 end

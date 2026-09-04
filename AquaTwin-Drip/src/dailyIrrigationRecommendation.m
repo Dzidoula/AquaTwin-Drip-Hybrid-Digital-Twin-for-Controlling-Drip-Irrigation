@@ -1,4 +1,4 @@
-function [should_irrigate, duration_s, volume, soil_moisture, severe_stress, psi_new, theta_infiltre_new, animation] = ...
+function [should_irrigate, duration_s, volume, soil_moisture, severe_stress, psi_new, theta_infiltre_new, animation, eto_mm_jour, pluie_48h_mm] = ...
     dailyIrrigationRecommendation(culture, lat, lon, JourJulien, psi_old, theta_infiltre, pas_heure, typeSol)
 
 if nargin < 6 || isempty(theta_infiltre)
@@ -36,7 +36,7 @@ end
 
 [X_all,Y_all,Xp,Yp,n_prim,n_dual,total_dof] = MeshGrid();
 [r_emitter, q_irr, Efficience] = parameterGoutteur();
-[T,RH,u2,Rs] = DataEvapotranspiration(lat,lon);
+[T,RH,u2,Rs,P] = DataEvapotranspiration(lat,lon);
 [alpha_vg,n_vg,m_vg,theta_s,theta_r,k_s] = vanMualemParametersValor(lat,lon);
 
 if isempty(psi_old)
@@ -44,6 +44,46 @@ if isempty(psi_old)
 end
 
 heure = datenum2hour();
+
+% ETo/pluie pour l'affichage cote appli (cartes HUMIDITE/ETO/PLUIE 48H du
+% Home) — calcules ici, avant le "return" anticipe ci-dessous, pour qu'ils
+% soient toujours renvoyes meme un jour ou ce n'est pas encore l'heure
+% d'irriguer. [] quand Open-Meteo est indisponible (T<0, meme convention
+% que le reste du fichier) : l'appli affiche alors "-" plutot qu'une
+% fausse valeur.
+if (T < 0)
+    eto_mm_jour = [];
+else
+    % Meme formule Penman-Monteith horaire (FAO-56) que
+    % CalculEvapotranspirationJournaliere.m/PenmanMontheithParameter.m,
+    % sans la conversion vers les unites internes du solveur (m/s) — ici
+    % une estimation mm/jour pour affichage, en etendant le taux horaire
+    % moyen sur 24h.
+    %
+    % BUG SUSPECTE (present dans PenmanMontheithParameter.m lui-meme, donc
+    % aussi dans le calcul interne d'ETo/Tpot/ETr utilise par le solveur —
+    % pas quelque chose introduit ici) : `Rn=(1-alpha)*Rs` traite Rs
+    % (rayonnement Open-Meteo, en W/m^2) comme s'il etait deja en
+    % MJ/m^2/heure, l'unite qu'attend la formule FAO-56 horaire
+    % (coefficients 0.409 et 37). Sans conversion, Rn est surestime d'un
+    % facteur ~278 (1 W/m^2 pendant 1h = 0.0036 MJ/m^2), ce qui donnait un
+    % ETo affiche de l'ordre de 800 mm/jour au lieu de quelques mm/jour.
+    % Corrige ICI (conversion Rs -> MJ/m^2/h avant l'appel) pour que la
+    % carte ETO de l'appli montre une valeur plausible, SANS toucher
+    % PenmanMontheithParameter.m ni le reste du solveur (meme fonction
+    % partagee par TenseurSol/Tpot/ETr en production — la corriger en
+    % place demande confirmation d'Alex, comme les autres bugs releves
+    % cette session). A confirmer avec lui.
+    Rs_MJ_par_m2_h = Rs * 0.0036;
+    [Delta_disp, Gamma_disp, Rn_disp, G_disp, T_disp, VPD_disp, u2_disp] = PenmanMontheithParameter(T,RH,u2,Rs_MJ_par_m2_h);
+    ET0_hourly_mm = max((0.409*Delta_disp.*(Rn_disp-G_disp)+Gamma_disp.*(37./(T_disp+273)).*abs(u2_disp).*VPD_disp)./(Delta_disp+Gamma_disp.*(1+0.208*abs(u2_disp))), 0);
+    eto_mm_jour = mean(ET0_hourly_mm) * 24;
+end
+if isempty(P)
+    pluie_48h_mm = [];
+else
+    pluie_48h_mm = sum(P(1:min(48, numel(P))));
+end
 
 if (T < 0)
     [Tmax,V] = TempsEtVolumeEauNecessaireIrrigationAbsolu(q_irr,total_dof,heure,culture,typeSol,lat,lon);
