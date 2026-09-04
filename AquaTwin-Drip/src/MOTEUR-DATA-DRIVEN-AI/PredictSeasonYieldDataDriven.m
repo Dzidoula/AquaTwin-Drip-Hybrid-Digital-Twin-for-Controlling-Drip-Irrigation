@@ -1,4 +1,4 @@
-function [Rendement, Biomasse, Appreciation] = PredictSeasonYieldDataDriven(lat, lon, culture, dateSemence, joursTest, etoTest)
+function [Rendement, Biomasse, Appreciation, RendementParJour, BiomasseParJour] = PredictSeasonYieldDataDriven(lat, lon, culture, dateSemence, joursTest, etoTest)
 % Port Octave de rendementPredictionGood.m — meme logique, meme resultat,
 % mais utilisable depuis notre pipeline serveur headless.
 %
@@ -54,6 +54,12 @@ function [Rendement, Biomasse, Appreciation] = PredictSeasonYieldDataDriven(lat,
     %% Rendement AquaCrop (Octave pur, deja compatible)
     [Rendement_, Biomasse_] = PredictPreviousHarvest_(culture, ETo_all);
 
+    % Copie pristine (avant la mise a zero des jours testes ci-dessous) —
+    % c'est celle-ci qui sert de courbe jour-par-jour pour l'affichage,
+    % voir la note plus bas pres de RendementParJour/BiomasseParJour.
+    RendementParJour = Rendement_;
+    BiomasseParJour = Biomasse_;
+
     A = joursTest(:)';
     for k = 1:length(A)
         if A(k) <= length(Rendement_)
@@ -73,5 +79,19 @@ function [Rendement, Biomasse, Appreciation] = PredictSeasonYieldDataDriven(lat,
     Biomasse = Rendement / Hi;
     Appreciation = EvaluerRendement(culture, Rendement);
     disp(Appreciation);
+
+    % RendementParJour/BiomasseParJour (voir plus haut, captures avant la
+    % mise a zero des jours testes) : la courbe jour-par-jour pour
+    % l'affichage cote appli. C'est deja une courbe plus realiste que celle
+    % du moteur physique affiche a cote (qui, lui, utilise une ETo fixe de
+    % 5 mm/j) puisqu'elle suit l'ETo prevue reelle jour par jour
+    % (EvapotranspirationCulture.py). On n'y substitue PAS la valeur
+    % predite par le modele ML aux jours testes (comme le fait le calcul
+    % du total scalaire ci-dessus) : ca creerait un pic visuel absurde sur
+    % la courbe (le ML predit une grandeur qui n'est pas sur la meme
+    % echelle qu'un increment journalier — voir la note sur
+    % `sum(Rendement_) + sum(Yield)` plus haut). Le resultat du scenario
+    % teste (avec ces jours) reste visible dans les cartes Rendement/
+    % Biomasse sous le graphique, pas sur la courbe elle-meme.
 
 end
