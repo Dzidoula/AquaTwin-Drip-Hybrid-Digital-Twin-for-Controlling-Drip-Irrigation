@@ -75,6 +75,18 @@ function [Rendement, Biomasse, Appreciation, RendementParJour, BiomasseParJour] 
     Yield = yield_output.yield_predicted(:)';
 
     [WP, Hi] = parameterAquaCrop(culture);
+
+    % BUG SUSPECTE, PAS CORRIGE ICI (fidele au script original d'Alexandre,
+    % en attente de sa confirmation avant de toucher a sa formule) :
+    % Rendement_ est deja une trajectoire CUMULATIVE jour par jour (comme
+    % PredictSeasonYield.m). En sommer les 120 valeurs (sum(Rendement_))
+    % revient a additionner 120 lectures cumulatives entre elles, ce qui
+    % gonfle artificiellement le total d'un facteur ~60 (verifie : sur un
+    % cas reel, sum(Rendement_)=6534 alors que sa derniere valeur, le vrai
+    % rendement final de la trajectoire, n'est que 108). Le rendement
+    % "normal" attendu serait plutot Rendement_(end) (+ l'effet des jours
+    % testes), pas cette somme. Signale a l'appli (avertissement visible
+    % sur la carte Rendement) et a confirmer avec Alexandre.
     Rendement = sum(Rendement_) + sum(Yield);
     Biomasse = Rendement / Hi;
     Appreciation = EvaluerRendement(culture, Rendement);
