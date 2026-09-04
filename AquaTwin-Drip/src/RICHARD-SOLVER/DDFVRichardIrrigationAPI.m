@@ -18,6 +18,17 @@ function [solution, Erreur]=DDFVRichardIrrigationAPI(psi_old,J,culture,typeSol,l
     N = 1/h;   % nombre de cellules par dimension
     psi_current = psi_old;
     K=TenseurSol(typeSol,k_s);
+    % TENTATIVE DE CORRECTION ESSAYEE ET ABANDONNEE (etait D = (10^(10))*r*K,
+    % essaye D = r*K comme dans DDFVRichardIrrigation.m) : retirer le
+    % facteur fait DIVERGER le solveur de Picard (erreur passant de 9.75e7
+    % a 2.04e10 a 3.31e12 en 3 pas de temps, jamais de convergence,
+    % verifie par execution reelle) au lieu de simplement "debloquer"
+    % l'animation. Ce n'est donc PAS un bug cosmetique isole : soit ce
+    % facteur compense un autre probleme d'unites/echelle ailleurs dans le
+    % systeme (maillage, pas de temps, conductivite), soit il est
+    % necessaire a la stabilite numerique telle que construite. Remis a
+    % sa valeur d'origine en attendant qu'Alexandre puisse se pencher
+    % dessus lui-meme — a ne pas retirer sans lui.
     D = (10^(10))*r*K; % Tenseur de permeabilite
     %[alpha_vg,n_vg, m_vg,theta_s, theta_r,k_s]=vanMualemParametersValor(lat,lon);
     [C,theta_func,kr_func,K_func]=VanMualemParameter(theta_s,theta_r,alpha_vg,n_vg,m_vg,k_s);
