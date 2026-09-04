@@ -99,6 +99,15 @@ ETr = EvapotranspirationRelle(max(Tpot),max(ETo),SH,heure,culture);
 [SH, Pt,t_t,Theta_root] = TraceTeneurEnEauRacinaireStresseHydriqueEtPotentielHydrique_(lat,lon,culture,typeSol,Tmax+3600,solution,Tmax,heure,alpha_vg,n_vg,m_vg,theta_s,theta_r,k_s);
 close all; % les fonctions ci-dessus ouvrent des figures meme en mode headless
 
+% Series temporelles (teneur en eau racinaire, stress hydrique, potentiel
+% hydrique) deja calculees ci-dessus par TraceTeneurEnEauRacinaireStresseHydriqueEtPotentielHydrique_
+% pour son propre graphique 3-panneaux (figure ignoree en headless) —
+% exportees ici telles quelles pour l'appli, sans nouveau calcul.
+animation.trend_t_s = t_t(:)';
+animation.trend_theta_root = Theta_root(:)';
+animation.trend_stress_hydrique = SH(:)';
+animation.trend_potentiel_hydrique = Pt(:)';
+
 should_irrigate = true;
 duration_s = max(Tmax);
 volume = max(V);
