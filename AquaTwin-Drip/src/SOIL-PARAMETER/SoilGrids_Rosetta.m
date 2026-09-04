@@ -33,22 +33,35 @@ end
 
 % 1. Texture du sol (Sand/Silt/Clay/BD)
 %
-% SOURCE : iSDA Africa, PAS SoilGrids/ISRIC malgre le nom de ce fichier
-% (conserve pour eviter de casser classifySoilType.m/vanMualemParametersValor.m
-% qui l'appellent par ce nom). ISRIC SoilGrids renvoie systematiquement
-% "mean": null pour toute coordonnee africaine testee (voir isda_soil_texture.m
-% pour le detail complet et les tests effectues le 2026-08-26) — remplace
-% par iSDA Africa (https://api.isda-africa.com), qui repond de facon fiable
-% sur les memes coordonnees beninoises. A VALIDER AVEC ALEX : changement de
-% source de donnees (30m/iSDA vs 250m/SoilGrids), pas seulement un correctif
-% de robustesse — le calcul Rosetta en aval, lui, ne change pas.
+% SOURCE PRINCIPALE : iSDA Africa, malgre le nom de ce fichier (conserve
+% pour eviter de casser classifySoilType.m/vanMualemParametersValor.m qui
+% l'appellent par ce nom) — voir isda_soil_texture.m pour le detail des
+% tests du 2026-08-26 qui ont motive ce choix. REPLI : ISRIC SoilGrids
+% (isric_soil_texture.m) quand iSDA n'a rien pour un point donne (constate
+% en pratique sur des coordonnees hors de sa couverture, ex. Sahel) — les
+% deux sources se completent plutot que de faire echouer tout le calcul.
+% A VALIDER AVEC ALEX : changement de source de donnees (30m/iSDA vs
+% 250m/SoilGrids selon la source utilisee), pas seulement un correctif de
+% robustesse — le calcul Rosetta en aval, lui, ne change pas.
 
 fprintf('Recherche pour lat=%.4f, lon=%.4f (iSDA Africa)\n', lat, lon);
 
 [Sand, Silt, Clay, BD] = isda_soil_texture(lat, lon);
 
+% REPLI ISRIC : iSDA Africa a ses propres trous de couverture (constate en
+% pratique sur des coordonnees saheliennes, hors de son jeu de donnees
+% agricole) — avant d'abandonner, on retente via ISRIC SoilGrids
+% (isric_soil_texture.m), qui peut avoir une valeur la ou iSDA n'en a pas
+% (couverture mondiale, methodologie differente). Si les DEUX sources
+% n'ont rien, message clair pour l'utilisateur plutot qu'une trace Octave.
 if any(isnan([Sand, Silt, Clay, BD]))
-    error('Aucune donnee iSDA Africa pour (%.4f, %.4f)', lat, lon);
+    fprintf('iSDA Africa : aucune donnee pour (%.4f, %.4f), tentative ISRIC SoilGrids.\n', lat, lon);
+    [Sand, Silt, Clay, BD] = isric_soil_texture(lat, lon);
+end
+
+if any(isnan([Sand, Silt, Clay, BD]))
+    error(['Aucune donnee de sol disponible pour ces coordonnees (%.4f, %.4f) ' ...
+        '— ni iSDA Africa, ni ISRIC SoilGrids. Verifiez la position choisie.'], lat, lon);
 end
 
 fprintf('Sable: %.1f%%, Limon: %.1f%%, Argile: %.1f%%, BD: %.3f g/cm3\n', ...
