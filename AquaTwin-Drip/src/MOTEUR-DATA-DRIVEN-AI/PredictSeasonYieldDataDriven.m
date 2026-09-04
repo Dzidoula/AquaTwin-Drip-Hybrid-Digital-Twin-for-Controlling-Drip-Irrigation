@@ -1,4 +1,4 @@
-function [Rendement, Biomasse] = PredictSeasonYieldDataDriven(lat, lon, culture, dateSemence, joursTest, etoTest)
+function [Rendement, Biomasse, Appreciation] = PredictSeasonYieldDataDriven(lat, lon, culture, dateSemence, joursTest, etoTest)
 % Port Octave de rendementPredictionGood.m — meme logique, meme resultat,
 % mais utilisable depuis notre pipeline serveur headless.
 %
@@ -71,7 +71,8 @@ function [Rendement, Biomasse] = PredictSeasonYieldDataDriven(lat, lon, culture,
     [WP, Hi] = parameterAquaCrop(culture);
     Rendement = sum(Rendement_) + sum(Yield);
     Biomasse = Rendement / Hi;
-    disp(EvaluerRendement(culture, Rendement));
+    Appreciation = EvaluerRendement(culture, Rendement);
+    disp(Appreciation);
 
 end
 
