@@ -131,6 +131,13 @@ end
 % du calcul.
 animation = export_animation_frames(solution, alpha_vg, n_vg, m_vg, theta_s, theta_r, k_s, t);
 
+% Grilles 12 images (debut/fin d'irrigation) demandees par Alexandre —
+% voir Trace2D.m/Trace2DFin.m (portage headless : export_trace2d_frames.m/
+% export_trace2dfin_frames.m). Meme `solution`/parametres, aucun nouveau
+% calcul physique.
+animation.trace_debut = export_trace2d_frames(solution, alpha_vg, n_vg, m_vg, theta_s, theta_r, k_s, t);
+animation.trace_fin = export_trace2dfin_frames(solution, alpha_vg, n_vg, m_vg, theta_s, theta_r, k_s, t);
+
 ETo = CalculEvapotranspirationJournaliere(heure,culture,typeSol,lat,lon,T,RH,u2,Rs);
 Tpot = TranspirationPotentielle(max(ETo),heure,culture);
 ETr = EvapotranspirationRelle(max(Tpot),max(ETo),SH,heure,culture);
