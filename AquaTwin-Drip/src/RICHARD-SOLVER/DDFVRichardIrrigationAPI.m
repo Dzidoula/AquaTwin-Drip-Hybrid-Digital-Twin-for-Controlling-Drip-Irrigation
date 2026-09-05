@@ -26,9 +26,21 @@ function [solution, Erreur]=DDFVRichardIrrigationAPI(psi_old,J,culture,typeSol,l
     % l'animation. Ce n'est donc PAS un bug cosmetique isole : soit ce
     % facteur compense un autre probleme d'unites/echelle ailleurs dans le
     % systeme (maillage, pas de temps, conductivite), soit il est
-    % necessaire a la stabilite numerique telle que construite. Remis a
-    % sa valeur d'origine en attendant qu'Alexandre puisse se pencher
-    % dessus lui-meme — a ne pas retirer sans lui.
+    % necessaire a la stabilite numerique telle que construite.
+    %
+    % MISE A JOUR (2026-09-05) : Alexandre confirme que D=10^10 et I=ones()
+    % (voir plus bas, `I=ones(total_dof)` au lieu de `I=eye(total_dof)`)
+    % sont bien des bugs, pas un choix delibere. Meme corriges ensemble
+    % (D=r*K + I=eye), le solveur devient stable (plus de divergence,
+    % erreur ~1e-12) mais le bulbe d'humectation reste quasi fige sous
+    % Octave — contrairement a ses propres executions sous MATLAB (meme
+    % fichier, memes bugs), qui montrent une vraie animation (GIF verifie,
+    % frame-a-frame). Alexandre confirme utiliser MATLAB, jamais Octave,
+    % pour ce moteur — cote appli (headless, Octave uniquement), la valeur
+    % d'origine (10^10, ones) est donc gardee ici pour rester fidele au
+    % modele reellement valide par lui, en attendant de comprendre la
+    % difference de comportement MATLAB/Octave elle-meme. Ne pas "corriger"
+    % ces deux lignes sans re-verifier l'effet sur l'animation.
     D = (10^(10))*r*K; % Tenseur de permeabilite
     %[alpha_vg,n_vg, m_vg,theta_s, theta_r,k_s]=vanMualemParametersValor(lat,lon);
     [C,theta_func,kr_func,K_func]=VanMualemParameter(theta_s,theta_r,alpha_vg,n_vg,m_vg,k_s);
@@ -350,15 +362,26 @@ function [solution, Erreur]=DDFVRichardIrrigationAPI(psi_old,J,culture,typeSol,l
             psi_new=psi_current +psi_inc ;
 
             %% VERIFICATION DE LA CONVERGENCE A CAUSE DE LA METHODE D'ITERATION DE PICARD POUR LA NON-LINEARITE
-            % BUG CORRIGE : comparait psi_new a psi_inc, alors que
-            % psi_new = psi_current + psi_inc par construction (ligne
-            % ci-dessus) — donc `psi_new - psi_inc` valait toujours
-            % psi_current, quel que soit l'ecart reel entre deux iterations.
-            % Le critere de convergence de Picard ne mesurait donc rien de
-            % pertinent (d'ou "convergence non atteinte" quasi systematique).
-            % Formule correcte deja utilisee dans DDFVRichardIrrigation.m
-            % (la variante sans meteo) : comparer aux iterations successives.
-            err = norm(psi_new - psi_current);
+            % REVERT DELIBERE (2026-09-05, sur decision explicite du
+            % fermier/testeur, pas d'Alexandre) : la formule d'origine
+            % `norm(psi_new - psi_inc)` est bien une identite algebrique —
+            % psi_new = psi_current + psi_inc par construction, donc ceci
+            % vaut toujours exactement norm(psi_current), quel que soit
+            % l'ecart reel entre deux iterations de Picard. On l'avait
+            % "corrigee" en norm(psi_new - psi_current) le 26 aout,
+            % mathematiquement plus juste — mais teste cote a cote contre
+            % un fichier envoye par Alexandre lui-meme (dossier "test_1",
+            % anime, GIF verifie non fige) : sa version (jamais convergee,
+            % 30 iterations forcees a CHAQUE pas de temps) produit un
+            % bulbe d'humectation qui evolue reellement dans le temps ;
+            % notre version "corrigee" converge des la 1ere iteration et
+            % fige le resultat des le debut. Aucune des deux formules ne
+            % mesure quelque chose de physiquement valide — celle-ci a le
+            % merite de reproduire ce qu'Alexandre observe reellement chez
+            % lui. A clarifier avec lui : ce n'est pas un critere de
+            % convergence fiable, juste un moyen accidentel de forcer
+            % max_iter iterations par pas de temps a chaque fois.
+            err = norm(psi_new - psi_inc);
             erreur = err / (norm(psi_new) + eps);
             
             if erreur <tol && iter< max_iter
